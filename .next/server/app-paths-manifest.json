@@ -1,0 +1,4 @@
+{
+  "/api/trips/route": "app/api/trips/route.js",
+  "/api/cron/sync/route": "app/api/cron/sync/route.js"
+}

@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shifting Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#eef2f5; --card:#ffffff; --text:#0f2942; --muted:#64748b; --line:#e5eaf0; --zebra:#f8fafc;
+    --brand:#0d9488; --navy:#0f2942; --neg:#dc2626; --pos:#0d9488; --warn:#d97706;
+    --shadow:0 1px 3px rgba(15,41,66,.08),0 4px 14px rgba(15,41,66,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0b1520; --card:#122130; --text:#e6edf5; --muted:#8fa3b8; --line:#223448; --zebra:#162738;
+            --brand:#2dd4bf; --navy:#0a1a2a; --neg:#f87171; --pos:#2dd4bf; --warn:#fbbf24; --shadow:0 1px 3px rgba(0,0,0,.5); }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 "Segoe UI",-apple-system,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+  header { background:var(--navy); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header .dot { width:11px; height:11px; border-radius:50%; background:#14b8a6; }
+  header h1 { margin:0; font-size:20px; font-weight:700; }
+  header .sub { display:none; }
+  header button { margin-left:auto; border:0; border-radius:8px; padding:7px 16px; font:inherit; font-weight:600; cursor:pointer; background:#14b8a6; color:#04211e; }
+  header button:disabled { opacity:.6; cursor:wait; }
+
+  .layout { display:grid; grid-template-columns:270px 1fr; align-items:start; }
+  aside { background:var(--card); border-right:1px solid var(--line); padding:18px 16px; position:sticky; top:0; height:calc(100vh - 0px); overflow-y:auto; }
+  aside h3 { margin:0 0 12px; font-size:13px; letter-spacing:.8px; color:var(--muted); }
+  aside label { display:block; margin:14px 0 5px; font-size:12.5px; color:var(--muted); }
+  aside select, aside input { width:100%; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit; background:var(--card); color:var(--text); }
+  aside select[multiple] { padding:4px; }
+  aside .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  aside .btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; position:sticky; bottom:0; background:var(--card); padding:8px 0; }
+  aside .abtn, aside .rbtn { border-radius:8px; padding:9px; font:inherit; font-weight:600; cursor:pointer; border:1px solid var(--brand); }
+  aside .abtn { background:var(--brand); color:#fff; }
+  aside .abtn:hover { opacity:.88; }
+  aside .rbtn { background:transparent; color:var(--brand); }
+  aside .rbtn:hover { background:var(--brand); color:#fff; }
+
+  main { padding:20px; min-width:0; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+  .card { background:var(--card); border-radius:12px; padding:14px 16px; box-shadow:var(--shadow); border-left:4px solid var(--c,var(--brand)); }
+  .card .l { color:var(--text); font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; }
+  .card .v { font-size:20px; font-weight:700; margin-top:6px; }
+  .card .v > span.amt { color:var(--c,var(--brand)); }
+  .card .sub2 { margin-top:6px; font-size:12px; color:var(--muted); line-height:1.6; }
+
+  section { background:var(--card); border-radius:12px; box-shadow:var(--shadow); margin-bottom:18px; overflow:hidden; }
+  section > h2 { margin:0; padding:14px 18px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  section > h2 .cnt { margin-left:auto; font-weight:500; font-size:12px; color:var(--muted); }
+  .scroll { overflow-x:auto; max-height:520px; }
+  table { width:100%; border-collapse:collapse; min-width:620px; }
+  th, td { padding:10px 14px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  th { position:sticky; top:0; background:var(--zebra); color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; user-select:none; z-index:1; }
+  th:hover { color:var(--brand); }
+  th.l, td.l { text-align:left; }
+  tbody tr:hover { background:color-mix(in srgb, var(--brand) 8%, transparent); }
+  tr.total td { font-weight:700; background:var(--zebra); border-top:2px solid var(--brand); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:99px; background:color-mix(in srgb, var(--brand) 14%, transparent); color:var(--brand); font-weight:600; font-size:12.5px; }
+  .neg { color:var(--neg); font-weight:600; } .pos { color:var(--pos); font-weight:600; }
+  .msg { padding:34px; text-align:center; color:var(--muted); }
+
+  .pager { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:11px 16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted); }
+  .pg { display:flex; gap:4px; flex-wrap:wrap; }
+  .pg button { min-width:32px; height:32px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer; font:inherit; }
+  .pg button:hover:not(:disabled) { border-color:var(--brand); color:var(--brand); }
+  .pg button.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+  .pg button:disabled { opacity:.4; cursor:default; }
+  .pager select { border:1px solid var(--line); border-radius:8px; padding:5px 8px; background:var(--card); color:var(--text); font:inherit; }
+
+  .chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; margin-bottom:18px; }
+  .chart-card { background:var(--card); border-radius:12px; box-shadow:var(--shadow); padding:16px; }
+  .chart-card h4 { margin:0 0 10px; font-size:15px; }
+  .chart-wrap { position:relative; height:270px; }
+
+  #loader { position:fixed; inset:0; z-index:9999; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; transition:opacity .3s; }
+  #loader.hide { opacity:0; pointer-events:none; }
+  .spinner { position:relative; width:86px; height:86px; display:flex; align-items:center; justify-content:center; }
+  .spinner::before { content:""; position:absolute; inset:0; border-radius:50%; border:6px solid var(--zebra);
+    border-top-color:var(--brand); border-right-color:var(--brand); animation:spin .9s linear infinite; }
+  .spinner .truck { position:relative; z-index:1; font-size:34px; line-height:1; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loader-text { text-align:center; }
+  .loader-text .lt { font-size:15px; font-weight:700; color:var(--text); }
+  .loader-text .ls { margin-top:3px; font-size:12.5px; color:var(--muted); }
+  #loader button { border:0; border-radius:8px; padding:8px 20px; font:inherit; font-weight:600; cursor:pointer; background:var(--brand); color:#fff; display:none; }
+  @media (max-width:900px) { .layout { grid-template-columns:1fr; } aside { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"><span class="truck">🚚</span></div>
+  <div class="loader-text">
+    <div class="lt" id="lt">Loading your data…</div>
+    <div class="ls" id="ls">Please wait, reading trips from the database</div>
+  </div>
+  <button id="retry">Retry</button>
+</div>
+
+<header>
+  <span class="dot"></span><h1>Shifting Dashboard</h1>
+  <span class="sub" id="upd">Loading...</span>
+  <button id="ref">Refresh</button>
+</header>
+
+<div class="layout">
+<aside>
+  <h3>FILTERS</h3>
+  <label>Date range</label>
+  <div class="row2"><input type="date" id="dFrom"><input type="date" id="dTo"></div>
+  <label>Record type</label><select id="fType"><option value="">All records</option></select>
+  <label>Site</label><select id="fSite" multiple size="4"></select>
+  <label>Plant</label><select id="fPlant" multiple size="4"></select>
+  <label>Transporter</label><select id="fTrn" multiple size="5"></select>
+  <label>Vehicle No</label><select id="fVeh" multiple size="5"></select>
+  <label>Search</label><input id="q" type="search" placeholder="Vehicle / challan / date / pump">
+  <div class="btns">
+    <button class="abtn" id="apply">Apply</button>
+    <button class="rbtn" id="reset">Clear</button>
+  </div>
+</aside>
+
+<main>
+  <div class="cards" id="cards"></div>
+
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Amount &amp; Net Payable by Month</h4><div class="chart-wrap"><canvas id="chMonth"></canvas></div></div>
+    <div class="chart-card"><h4>Top Transporters by Amount</h4><div class="chart-wrap"><canvas id="chTrn"></canvas></div></div>
+    <div class="chart-card"><h4>Trips by Site</h4><div class="chart-wrap"><canvas id="chSite"></canvas></div></div>
+    <div class="chart-card"><h4>Top Vehicles by Weight (MT)</h4><div class="chart-wrap"><canvas id="chVeh"></canvas></div></div>
+    <div class="chart-card"><h4>Trip Count by Plant</h4><div class="chart-wrap"><canvas id="chPlant"></canvas></div></div>
+    <div class="chart-card"><h4>Amount Trend by Date</h4><div class="chart-wrap"><canvas id="chDate"></canvas></div></div>
+    <div class="chart-card" id="cardPD"><h4>Paid vs Due by Transporter</h4><div class="chart-wrap"><canvas id="chPD"></canvas></div></div>
+  </div>
+
+  <section id="s-plantsum"><h2>Plant Summary<span class="cnt" id="c-plantsum"></span></h2>
+    <div class="cards" id="plantCards" style="padding:16px;margin:0;"></div></section>
+
+  <section id="s-tabs"><h2>Summary by Site<span class="cnt" id="c-tabs"></span></h2>
+    <div class="scroll" id="t-tabs"></div><div id="p-tabs"></div></section>
+
+  <section id="s-veh"><h2>Vehicle-wise<span class="cnt" id="c-veh"></span></h2>
+    <div class="scroll" id="t-veh"></div><div id="p-veh"></div></section>
+
+  <section id="s-trn"><h2>Transporter-wise<span class="cnt" id="c-trn"></span></h2>
+    <div class="scroll" id="t-trn"></div><div id="p-trn"></div></section>
+
+  <section id="s-pln"><h2>Plant-wise (by Site)<span class="cnt" id="c-pln"></span></h2>
+    <div class="scroll" id="t-pln"></div><div id="p-pln"></div></section>
+
+  <section id="s-date"><h2>Date-wise<span class="cnt" id="c-date"></span></h2>
+    <div class="scroll" id="t-date"></div><div id="p-date"></div></section>
+
+  <section id="s-trips"><h2>All trips (full data)<span class="cnt" id="c-trips"></span></h2>
+    <div class="scroll" id="t-trips"></div><div id="p-trips"></div></section>
+</main>
+</div>
+
+<script>
+  var DATA = null, PS = {}, CHARTS = {};
+  var COLS_BASE = [['trips','Trips'],['amount','Amount'],['tds','TDS'],['qty','Diesel Qty'],['dAmt','Diesel Amt'],['oth','Other Ded'],['net','Net Amt']];
+  var COLS_PD = [['paidAmt','Paid Amt'],['dueAmt','Due Amt']];
+  var COLS = COLS_BASE;
+  function isPDTab(tab) { return true; }   // Paid / Due shown for every site
+  var SIZES = [10, 25, 50, 100];
+  var PAL = ['#0d9488','#0f2942','#f59e0b','#3b82f6','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+  var MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Transporter colours: same name = same colour everywhere
+  var PAL_TRN = ['#3b82f6','#f59e0b','#0d9488','#ec4899','#8b5cf6','#ef4444','#06b6d4','#84cc16',
+                 '#f97316','#6366f1','#14b8a6','#a855f7','#eab308','#22c55e','#e11d48','#0ea5e9'];
+  var TRN_COLORS = {};
+  function trnColor(name) {
+    name = String(name || '');
+    if (TRN_COLORS[name]) return TRN_COLORS[name];
+    var used = Object.keys(TRN_COLORS).map(function (k) { return TRN_COLORS[k]; });
+    var c = PAL_TRN.filter(function (p) { return used.indexOf(p) < 0; })[0];
+    if (!c) {
+      var h = 0;
+      for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      c = PAL_TRN[h % PAL_TRN.length];
+    }
+    TRN_COLORS[name] = c;
+    return c;
+  }
+
+  function st(id) { return PS[id] || (PS[id] = { page: 1, size: 10, k: null, asc: false }); }
+  function fmt(n, d) { return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+    });
+  }
+  function $(id) { return document.getElementById(id); }
+  function sel(id) { return Array.prototype.filter.call($(id).options, function (o) { return o.selected; }).map(function (o) { return o.value; }); }
+
+  function dkey(s) {
+    var months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+    var m = /^(\d{1,2})[\/\-]([A-Za-z]{3}|\d{1,2})[\/\-](\d{2,4})/.exec(s || '');
+    if (m) {
+      var mon = /^[A-Za-z]{3}$/.test(m[2]) ? months[m[2]] : (parseInt(m[2], 10) - 1);
+      var yr = m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10);
+      if (mon !== undefined && !isNaN(mon)) return new Date(yr, mon, parseInt(m[1], 10)).getTime();
+    }
+    var t = Date.parse(s);
+    return isNaN(t) ? 0 : t;
+  }
+
+  function showLoader(on, err) {
+    var L = $('loader');
+    if (on) {
+      L.classList.remove('hide');
+      $('lt').textContent = 'Loading your data…';
+      $('ls').textContent = 'Please wait, reading trips from the database';
+      $('retry').style.display = 'none';
+    } else if (err) {
+      L.classList.remove('hide');
+      $('lt').textContent = 'Could not load data';
+      $('ls').textContent = err;
+      $('retry').style.display = 'inline-block';
+    } else {
+      L.classList.add('hide');
+    }
+  }
+
+  // Data now comes from our MongoDB through /api/trips
+  function load() {
+    var b = $('ref'); b.disabled = true; b.textContent = 'Loading...';
+    showLoader(true);
+    fetch('/api/trips', { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 401) { location.href = '/login'; throw new Error('Login required'); }
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        DATA = d; b.disabled = false; b.textContent = 'Refresh';
+        try { init(); showLoader(false); }
+        catch (e) { showLoader(false, 'Display error: ' + e.message); }
+      })
+      .catch(function (e) {
+        b.disabled = false; b.textContent = 'Refresh';
+        $('upd').textContent = 'Error: ' + e.message;
+        showLoader(false, e.message);
+      });
+  }
+  $('retry').addEventListener('click', load);
+
+  function fillSel(id, vals, labels) {
+    var el = $(id), keep = sel(id);
+    el.innerHTML = vals.map(function (v, i) {
+      return '<option value="' + esc(v) + '"' + (keep.indexOf(v) >= 0 ? ' selected' : '') + '>' + esc(labels ? labels[i] : v) + '</option>';
+    }).join('');
+  }
+  function uniq(rows, f) {
+    return Array.from(new Set(rows.map(f).filter(Boolean))).sort(function (a, b) { return a.localeCompare(b); });
+  }
+
+  function recordType(r) {
+    if (r.amount > 0 || r.net !== 0) return 'Trip';
+    if (r.qty > 0) return 'Diesel Only';
+    return 'Other';
+  }
+
+  function init() {
+    DATA.trips.forEach(function (r) {
+      r._t = r.dateTs || dkey(r.date);
+      if (r._t) { var d = new Date(r._t); r._m = d.getFullYear() * 100 + d.getMonth(); }
+      else r._m = 0;
+      r._type = recordType(r);
+    });
+    TRN_COLORS = {};
+    uniq(DATA.trips, function (r) { return (r.transporter || '').trim(); }).forEach(function (n) { trnColor(n); });
+
+    fillSel('fSite', DATA.tabs.map(function (t) { return t.tab; }));
+    var types = uniq(DATA.trips, function (r) { return r._type; });
+    var keepType = $('fType').value;
+    $('fType').innerHTML = '<option value="">All records</option>' +
+      types.map(function (t) { return '<option' + (t === keepType ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+    scopedOptions();
+    $('upd').textContent = 'Updated ' + DATA.updated +
+      (DATA.skipped && DATA.skipped.length ? '  •  Not read (check headers): ' + DATA.skipped.join(', ') : '');
+    render();
+  }
+
+  function scopedOptions() {
+    var sites = sel('fSite');
+    var base = DATA.trips.filter(function (r) { return !sites.length || sites.indexOf(r.tab) >= 0; });
+    fillSel('fPlant', uniq(base, function (r) { return (r.plant || '').trim(); }));
+    fillSel('fTrn', uniq(base, function (r) { return (r.transporter || '').trim(); }));
+    fillSel('fVeh', uniq(base, function (r) { return (r.vehicle || '').trim(); }));
+  }
+
+  var APPLIED = { sites: [], plants: [], trns: [], vehs: [], type: '', q: '', f: '', t: '' };
+  function snapshot() {
+    return { sites: sel('fSite'), plants: sel('fPlant'), trns: sel('fTrn'), vehs: sel('fVeh'), type: $('fType').value,
+             q: $('q').value.trim().toLowerCase(), f: $('dFrom').value, t: $('dTo').value };
+  }
+
+  function filtered() {
+    var A = APPLIED;
+    var sites = A.sites, plants = A.plants, trns = A.trns, vehs = A.vehs, type = A.type;
+    var q = A.q, f = A.f, t = A.t;
+    var from = f ? new Date(f + 'T00:00:00').getTime() : 0;
+    var to = t ? new Date(t + 'T23:59:59').getTime() : 0;
+    return DATA.trips.filter(function (r) {
+      if (sites.length && sites.indexOf(r.tab) < 0) return false;
+      if (plants.length && plants.indexOf((r.plant || '').trim()) < 0) return false;
+      if (trns.length && trns.indexOf((r.transporter || '').trim()) < 0) return false;
+      if (vehs.length && vehs.indexOf((r.vehicle || '').trim()) < 0) return false;
+      if (type && r._type !== type) return false;
+      if (from && (!r._t || r._t < from)) return false;
+      if (to && (!r._t || r._t > to)) return false;
+      if (q && (r.vehicle + ' ' + r.challan + ' ' + r.date + ' ' + r.transporter + ' ' + r.plant + ' ' + r.pump).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function aggBy(rows, field) {
+    var map = {}, order = [];
+    rows.forEach(function (r) {
+      var val = field === 'tab' ? r.tab : (r[field] || '').trim();
+      if (field !== 'tab' && !val) return;
+      var k = r.tab + '|' + val;
+      if (!map[k]) { map[k] = { tab: r.tab, key: val, trips: 0, amount: 0, tds: 0, qty: 0, dAmt: 0, net: 0, oth: 0, wt: 0, paidAmt: 0, dueAmt: 0 }; order.push(k); }
+      var o = map[k];
+      o.trips++; o.amount += r.amount; o.tds += r.tds; o.qty += r.qty; o.dAmt += r.dAmt; o.net += r.net; o.oth += (r.oth || 0); o.wt += r.wt;
+      o.paidAmt += r.paidAmt; o.dueAmt += r.dueAmt;
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  function aggMerged(rows, field) {
+    var map = {}, order = [];
+    rows.forEach(function (r) {
+      var val = (r[field] || '').trim();
+      if (!val) return;
+      if (!map[val]) { map[val] = { key: val, trips: 0, amount: 0, tds: 0, qty: 0, dAmt: 0, net: 0, oth: 0, wt: 0, paidAmt: 0, dueAmt: 0 }; order.push(val); }
+      var o = map[val];
+      o.trips++; o.amount += r.amount; o.tds += r.tds; o.qty += r.qty; o.dAmt += r.dAmt; o.net += r.net; o.oth += (r.oth || 0); o.wt += r.wt;
+      o.paidAmt += r.paidAmt; o.dueAmt += r.dueAmt;
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  function card(l, v, c) {
+    var val = /^</.test(String(v)) ? v : '<span class="amt">' + v + '</span>';
+    return '<div class="card" style="--c:' + c + '"><div class="l">' + l + '</div><div class="v">' + val + '</div></div>';
+  }
+
+  function renderPlantCards(merged) {
+    $('c-plantsum').textContent = merged.length + ' plant(s)';
+    if (!merged.length) { $('plantCards').innerHTML = '<div class="msg">No plant data found for this filter</div>'; return; }
+    $('plantCards').innerHTML = merged.map(function (r, i) {
+      return '<div class="card" style="--c:' + PAL[i % PAL.length] + '"><div class="l">' + esc(r.key) + '</div>' +
+        '<div class="v">' + fmt(r.trips, 0) + ' trips</div>' +
+        '<div class="sub2">Amount: ' + fmt(r.amount, 2) + '<br>Net: ' + fmt(r.net, 2) + '</div></div>';
+    }).join('');
+  }
+
+  function render() {
+    var rows = filtered();
+    var tot = { trips: 0, amount: 0, tds: 0, qty: 0, dAmt: 0, net: 0, oth: 0, wt: 0, paidAmt: 0, dueAmt: 0 };
+    rows.forEach(function (r) {
+      tot.trips++; tot.amount += r.amount; tot.tds += r.tds; tot.qty += r.qty; tot.dAmt += r.dAmt; tot.net += r.net; tot.oth += (r.oth || 0); tot.wt += r.wt;
+      tot.paidAmt += r.paidAmt; tot.dueAmt += r.dueAmt;
+    });
+
+    var vehN = new Set(rows.map(function (r) { return r.vehicle; })).size;
+    var trnN = new Set(rows.map(function (r) { return (r.transporter || '').trim(); }).filter(Boolean)).size;
+
+    var showPD = rows.some(function (r) { return isPDTab(r.tab); });
+    COLS = showPD ? COLS_BASE.concat(COLS_PD) : COLS_BASE;
+
+    $('cards').innerHTML =
+      card('Total Transporters', fmt(trnN, 0), '#0d9488') +
+      card('Total Trips', fmt(tot.trips, 0), '#0d9488') +
+      card('Active vehicles', fmt(vehN, 0), '#0d9488') +
+      card('Total weight (MT)', fmt(tot.wt, 2), '#0d9488') +
+      card('Total Purchase Amount', '₹' + fmt(tot.amount, 2), '#0d9488') +
+      card('Diesel quantity (L)', fmt(tot.qty, 2), '#0d9488') +
+      card('Diesel Amount', '₹' + fmt(tot.dAmt, 2), '#0d9488') +
+      card('TDS Deductions', '₹' + fmt(tot.tds, 2), '#d97706') +
+      card('Other Deductions', '₹' + fmt(tot.oth, 2), '#d97706') +
+      card('Net Purchase Payable', '<span class="' + (tot.net < 0 ? 'neg' : '') + '">₹' + fmt(tot.net, 2) + '</span>', '#0d9488') +
+      (showPD ? card('Purchase Paid', '₹' + fmt(tot.paidAmt, 2), '#0d9488') : '') +
+      (showPD ? card('Purchase Balance', '<span class="' + (tot.dueAmt > 0 ? 'neg' : '') + '">₹' + fmt(tot.dueAmt, 2) + '</span>', '#d97706') : '');
+
+    var plantMerged = aggMerged(rows, 'plant').sort(function (a, b) { return b.trips - a.trips; });
+    renderPlantCards(plantMerged);
+
+    var multi = DATA.tabs.length > 1;
+    var srt = function (a, b) { return a.tab.localeCompare(b.tab) || a.key.localeCompare(b.key); };
+    var veh = aggBy(rows, 'vehicle').sort(srt);
+    var trn = aggBy(rows, 'transporter').sort(srt);
+    var pln = aggBy(rows, 'plant').sort(srt);
+    var dts = aggBy(rows, 'date').sort(function (a, b) {
+      return a.tab.localeCompare(b.tab) || dkey(a.key) - dkey(b.key);
+    });
+
+    paint('tabs', aggBy(rows, 'tab'), [['tab', 'Site']], tot);
+    paint('veh', veh, (multi ? [['tab', 'Site']] : []).concat([['key', 'Vehicle']]));
+    paint('trn', trn, (multi ? [['tab', 'Site']] : []).concat([['key', 'Transporter']]));
+    paint('pln', pln, (multi ? [['tab', 'Site']] : []).concat([['key', 'Plant']]));
+    paint('date', dts, (multi ? [['tab', 'Site']] : []).concat([['key', 'Date']]));
+    paintTrips(rows, multi);
+    drawCharts(rows, plantMerged);
+  }
+
+  /* ---------- charts ---------- */
+  function themeColor(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function mkChart(id, cfg) {
+    if (CHARTS[id]) CHARTS[id].destroy();
+    var el = $(id);
+    if (!el || typeof Chart === 'undefined') return;
+    CHARTS[id] = new Chart(el, cfg);
+  }
+  function topN(arr, k, n) { return arr.slice().sort(function (a, b) { return b[k] - a[k]; }).slice(0, n); }
+
+  function drawCharts(rows, plantMerged) {
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.color = themeColor('--muted') || '#64748b';
+    Chart.defaults.borderColor = themeColor('--line') || '#e5eaf0';
+    Chart.defaults.font.size = 11;
+    var base = { responsive: true, maintainAspectRatio: false };
+    var noLeg = { legend: { display: false } };
+    var PAL_SITE = ['#f59e0b','#3b82f6','#0d9488','#ec4899','#8b5cf6','#14b8a6','#ef4444','#0f2942'];
+    var PAL_PLANT = ['#3b82f6','#f97316','#0d9488','#a855f7','#ef4444','#facc15','#06b6d4','#ec4899'];
+
+    var byM = {};
+    rows.forEach(function (r) {
+      if (!r._m) return;
+      var o = byM[r._m] || (byM[r._m] = { amount: 0, net: 0 });
+      o.amount += r.amount; o.net += r.net;
+    });
+    var mk = Object.keys(byM).sort();
+    mkChart('chMonth', { type: 'bar', data: {
+      labels: mk.map(function (m) { return MN[m % 100] + ' ' + Math.floor(m / 100); }),
+      datasets: [
+        { label: 'Amount', data: mk.map(function (m) { return byM[m].amount; }), backgroundColor: '#0d9488', borderRadius: 4 },
+        { label: 'Net Payable', data: mk.map(function (m) { return byM[m].net; }), backgroundColor: '#f59e0b', borderRadius: 4 }
+      ] }, options: Object.assign({}, base, { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }) });
+
+    var trn = topN(aggMerged(rows, 'transporter'), 'amount', 8);
+    mkChart('chTrn', { type: 'bar', data: {
+      labels: trn.map(function (r) { return r.key; }),
+      datasets: [{ label: 'Amount', data: trn.map(function (r) { return r.amount; }),
+                   backgroundColor: trn.map(function (r) { return trnColor(r.key); }), borderRadius: 4 }] },
+      options: Object.assign({}, base, { indexAxis: 'y', plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { afterBody: function (items) {
+          if (!items.length) return '';
+          var r = trn[items[0].dataIndex];
+          return ['Paid: ₹' + fmt(r.paidAmt, 2), 'Due: ₹' + fmt(r.dueAmt, 2)];
+        } } } } }) });
+
+    mkChart('chPD', { type: 'bar', data: {
+      labels: trn.map(function (r) { return r.key; }),
+      datasets: [
+        { label: 'Paid', data: trn.map(function (r) { return r.paidAmt; }), backgroundColor: '#0d9488', borderRadius: 4 },
+        { label: 'Due', data: trn.map(function (r) { return r.dueAmt; }), backgroundColor: '#dc2626', borderRadius: 4 }
+      ] }, options: Object.assign({}, base, { indexAxis: 'y', plugins: { legend: { position: 'bottom' } },
+        scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } } }) });
+
+    var site = aggBy(rows, 'tab');
+    mkChart('chSite', { type: 'doughnut', data: {
+      labels: site.map(function (r) { return r.tab; }),
+      datasets: [{ data: site.map(function (r) { return r.trips; }), backgroundColor: PAL_SITE }] },
+      options: Object.assign({}, base, { plugins: { legend: { position: 'bottom' } } }) });
+
+    var veh = topN(aggMerged(rows, 'vehicle'), 'wt', 8);
+    mkChart('chVeh', { type: 'bar', data: {
+      labels: veh.map(function (r) { return r.key; }),
+      datasets: [{ label: 'MT', data: veh.map(function (r) { return r.wt; }), backgroundColor: '#8b5cf6', borderRadius: 4 }] },
+      options: Object.assign({}, base, { indexAxis: 'y', plugins: noLeg }) });
+
+    mkChart('chPlant', { type: 'bar', data: {
+      labels: plantMerged.map(function (r) { return r.key; }),
+      datasets: [{ label: 'Trips', data: plantMerged.map(function (r) { return r.trips; }), backgroundColor: PAL_PLANT, borderRadius: 4 }] },
+      options: Object.assign({}, base, { plugins: noLeg, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }) });
+
+    var dm = aggMerged(rows, 'date').sort(function (a, b) { return dkey(a.key) - dkey(b.key); });
+    if (dm.length > 30) dm = dm.slice(-30);
+    mkChart('chDate', { type: 'line', data: {
+      labels: dm.map(function (r) { return r.key; }),
+      datasets: [
+        { label: 'Amount', data: dm.map(function (r) { return r.amount; }), borderColor: '#ec4899', backgroundColor: 'rgba(236,72,153,.15)', tension: .3, fill: true },
+        { label: 'Net Amt', data: dm.map(function (r) { return r.net; }), borderColor: '#14b8a6', tension: .3 }
+      ] }, options: Object.assign({}, base, { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }) });
+  }
+
+  /* ---------- tables ---------- */
+  var TCOLS_BASE = [['date','Date',1],['challan','Challan',1],['vehicle','Vehicle',1],['transporter','Transporter',1],['plant','Plant',1],
+               ['wt','Wt (MT)',0],['amount','Amount',0],['tds','TDS',0],['qty','Diesel Qty',0],['dAmt','Diesel Amt',0],['oth','Other Ded',0],['net','Net Amt',0]];
+  var TCOLS_PD = [['paidAmt','Paid Amt',0],['dueAmt','Due Amt',0]];
+  var TCOLS_TAIL = [['pump','Pump',1],['time','Time',1],['rtype','Type',1]];
+
+  function pager(id, s, total, sizes) {
+    var pages = Math.max(1, Math.ceil(total / s.size));
+    var from = (s.page - 1) * s.size, to = Math.min(from + s.size, total);
+    var p = '<div class="pager"><div>Showing ' + (from + 1) + '–' + to + ' of ' + total + '</div><div class="pg">';
+    p += pbtn(id, s.page - 1, '‹', s.page === 1, false);
+    pageList(s.page, pages).forEach(function (n) {
+      p += n === '…' ? '<button disabled>…</button>' : pbtn(id, n, n, false, n === s.page);
+    });
+    p += pbtn(id, s.page + 1, '›', s.page === pages, false) + '</div>';
+    p += '<div>Rows <select data-size="' + id + '">' + sizes.map(function (n) {
+      return '<option' + (n === s.size ? ' selected' : '') + '>' + n + '</option>';
+    }).join('') + '</select></div></div>';
+    return p;
+  }
+
+  function sortRows(rows, s) {
+    return rows.slice().sort(function (a, b) {
+      var x = a[s.k], y = b[s.k];
+      var r = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+      return s.asc ? r : -r;
+    });
+  }
+
+  function paintTrips(rows, multi) {
+    var id = 'trips', s = st(id);
+    if (!s.init) { s.size = 25; s.init = true; }
+    $('c-' + id).textContent = rows.length + ' rows';
+    if (!rows.length) { $('t-' + id).innerHTML = '<div class="msg">No data found</div>'; $('p-' + id).innerHTML = ''; return; }
+
+    rows = s.k ? sortRows(rows, s) : rows.slice().reverse();
+    var pages = Math.max(1, Math.ceil(rows.length / s.size));
+    if (s.page > pages) s.page = pages;
+    var from = (s.page - 1) * s.size, slice = rows.slice(from, from + s.size);
+
+    var showPD = rows.some(function (r) { return isPDTab(r.tab); });
+    var TCOLS = TCOLS_BASE.concat(showPD ? TCOLS_PD : []).concat(TCOLS_TAIL);
+    var cols = (multi ? [['tab', 'Site', 1]] : []).concat(TCOLS);
+    var arrow = function (k) { return s.k === k ? (s.asc ? ' ▲' : ' ▼') : ''; };
+    var h = '<table style="min-width:1200px"><thead><tr>';
+    cols.forEach(function (c) { h += '<th class="' + (c[2] ? 'l' : '') + '" data-t="' + id + '" data-k="' + c[0] + '">' + c[1] + arrow(c[0]) + '</th>'; });
+    h += '</tr></thead><tbody>';
+    slice.forEach(function (r) {
+      h += '<tr>';
+      cols.forEach(function (c) {
+        var v = r[c[0]];
+        if (c[0] === 'vehicle') h += '<td class="l"><span class="pill">' + esc(v) + '</span></td>';
+        else if (c[0] === 'net') h += '<td class="' + (v < 0 ? 'neg' : 'pos') + '">' + fmt(v, 2) + '</td>';
+        else if (c[0] === 'dueAmt') h += '<td class="' + (v > 0 ? 'neg' : '') + '">' + fmt(v, 2) + '</td>';
+        else if (!c[2]) h += '<td>' + fmt(v, 2) + '</td>';
+        else h += '<td class="l">' + esc(v) + '</td>';
+      });
+      h += '</tr>';
+    });
+    $('t-' + id).innerHTML = h + '</tbody></table>';
+    $('p-' + id).innerHTML = pager(id, s, rows.length, [10, 25, 50, 100, 500]);
+  }
+
+  function cells(r, includePD) {
+    var h = '<td>' + fmt(r.trips, 0) + '</td><td>' + fmt(r.amount, 2) + '</td><td>' + fmt(r.tds, 2) +
+      '</td><td>' + fmt(r.qty, 2) + '</td><td>' + fmt(r.dAmt, 2) +
+      '</td><td>' + fmt(r.oth, 2) +
+      '</td><td class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net, 2) + '</td>';
+    if (includePD) h += '<td>' + fmt(r.paidAmt, 2) + '</td><td class="' + (r.dueAmt > 0 ? 'neg' : '') + '">' + fmt(r.dueAmt, 2) + '</td>';
+    return h;
+  }
+
+  function paint(id, rows, lead, total) {
+    var s = st(id);
+    var includePD = COLS.length > COLS_BASE.length;
+    $('c-' + id).textContent = rows.length + (id === 'tabs' ? ' site(s)' : ' rows');
+    if (!rows.length) { $('t-' + id).innerHTML = '<div class="msg">No data found</div>'; $('p-' + id).innerHTML = ''; return; }
+
+    if (s.k) rows = sortRows(rows, s);
+    var pages = Math.max(1, Math.ceil(rows.length / s.size));
+    if (s.page > pages) s.page = pages;
+    var from = (s.page - 1) * s.size, slice = rows.slice(from, from + s.size);
+
+    var arrow = function (k) { return s.k === k ? (s.asc ? ' ▲' : ' ▼') : ''; };
+    var h = '<table><thead><tr>';
+    lead.forEach(function (c) { h += '<th class="l" data-t="' + id + '" data-k="' + c[0] + '">' + c[1] + arrow(c[0]) + '</th>'; });
+    COLS.forEach(function (c) { h += '<th data-t="' + id + '" data-k="' + c[0] + '">' + c[1] + arrow(c[0]) + '</th>'; });
+    h += '</tr></thead><tbody>';
+    slice.forEach(function (r) {
+      h += '<tr>';
+      lead.forEach(function (c) {
+        var cell;
+        if (c[0] === 'key' && id === 'veh') cell = '<span class="pill">' + esc(r.key) + '</span>';
+        else if (c[0] === 'key' && id === 'trn') cell = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:' + trnColor(r.key) + '"></span>' + esc(r.key);
+        else cell = esc(r[c[0]]);
+        h += '<td class="l">' + cell + '</td>';
+      });
+      h += cells(r, includePD) + '</tr>';
+    });
+    if (total) h += '<tr class="total"><td class="l" colspan="' + lead.length + '">Total</td>' + cells(total, includePD) + '</tr>';
+    $('t-' + id).innerHTML = h + '</tbody></table>';
+
+    $('p-' + id).innerHTML = rows.length <= SIZES[0] ? '' : pager(id, s, rows.length, SIZES);
+  }
+
+  function pbtn(id, page, label, dis, on) {
+    return '<button data-pg="' + id + '|' + page + '"' + (dis ? ' disabled' : '') + (on ? ' class="on"' : '') + '>' + label + '</button>';
+  }
+  function pageList(cur, total) {
+    var out = [], add = function (n) { if (out.indexOf(n) < 0) out.push(n); };
+    add(1);
+    if (cur - 2 > 2) add('…');
+    for (var i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) add(i);
+    if (cur + 2 < total - 1) add('…');
+    if (total > 1) add(total);
+    return out;
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', function (e) {
+    if (!DATA) return;
+    var pg = e.target.closest && e.target.closest('button[data-pg]');
+    if (pg) { var a = pg.getAttribute('data-pg').split('|'); st(a[0]).page = parseInt(a[1], 10); render(); return; }
+    var th = e.target.closest && e.target.closest('th[data-k]');
+    if (th) {
+      var s = st(th.getAttribute('data-t')), k = th.getAttribute('data-k');
+      s.asc = s.k === k ? !s.asc : false; s.k = k; s.page = 1; render();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (!DATA) return;
+    var sz = e.target.getAttribute && e.target.getAttribute('data-size');
+    if (sz) { var s = st(sz); s.size = parseInt(e.target.value, 10); s.page = 1; render(); }
+  });
+
+  function resetPages() { for (var k in PS) PS[k].page = 1; }
+  function applyFilters() { if (DATA) { APPLIED = snapshot(); resetPages(); render(); } }
+  $('apply').addEventListener('click', applyFilters);
+  $('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') applyFilters(); });
+  $('fSite').addEventListener('change', function () { if (DATA) scopedOptions(); });
+  $('reset').addEventListener('click', function () {
+    ['fSite', 'fPlant', 'fTrn', 'fVeh'].forEach(function (id) {
+      Array.prototype.forEach.call($(id).options, function (o) { o.selected = false; });
+    });
+    $('fType').value = '';
+    $('dFrom').value = ''; $('dTo').value = ''; $('q').value = '';
+    if (DATA) { scopedOptions(); applyFilters(); }
+  });
+  // Refresh = sync from sheet into MongoDB (/api/cron/sync), then reload from database
+  $('ref').addEventListener('click', function () {
+    var b = $('ref'); b.disabled = true; b.textContent = 'Syncing...';
+    showLoader(true);
+    $('ls').textContent = 'Syncing from the sheet, please wait…';
+    fetch('/api/cron/sync', { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 401) { location.href = '/login'; throw new Error('Login required'); }
+        if (!r.ok) return r.json().then(function (j) { throw new Error('Sync failed: ' + (j.error || r.status)); });
+      })
+      .then(load)
+      .catch(function (e) {
+        b.disabled = false; b.textContent = 'Refresh';
+        showLoader(false, e.message);
+      });
+  });
+
+  load();
+</script>
+</body>
+</html>
