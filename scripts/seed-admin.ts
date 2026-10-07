@@ -6,3 +6,5 @@ import { getDb } from '../lib/db';
   await db.collection('users').updateOne({ email }, { $set: { email, hash: await bcrypt.hash(process.env.ADMIN_PASSWORD!, 10) } }, { upsert: true });
   console.log('Admin ready:', email); process.exit(0);
 })();
+
+
