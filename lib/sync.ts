@@ -13,7 +13,10 @@ const HEADERS: Record<string, string[]> = {
   dieselAmt: ['TOTALDIESELAMT', 'DIESELAMT', 'DIESELAMOUNT', 'TOTALDIESEL'],
   net: ['NETAMT', 'NETPAYABLE', 'NETAMOUNT', 'NET'], challan: ['CHALLANNO', 'CHALLAN'],
   transporter: ['TRANSPORTERNAME', 'TRANSPORTER'], plant: ['PLANTNAME', 'PLANT'], pump: ['PUMPNAME'],
-  time: ['UNLOADINGTIME', 'UNLADINGTIME'], rowType: ['TYPE'], paidAmt: ['PAIDAMT'], dueAmt: ['DUEAMT'],
+  time: ['UNLOADINGTIME', 'UNLADINGTIME'], rowType: ['TYPE'],
+  // CHANGED: more header names accepted for paid / due columns
+  paidAmt: ['PAIDAMT', 'PAIDAMOUNT', 'PAID', 'PAYMENT', 'PAYMENTAMT', 'ADVANCE'],
+  dueAmt: ['DUEAMT', 'DUEAMOUNT', 'DUE', 'BALANCE', 'BALANCEAMT'],
 };
 type Layout = Record<string, number> & { headerRow: number };
 type Cell = string | number | boolean | null | undefined;
@@ -150,6 +153,10 @@ export async function syncFromSheet() {
     for (let i = L.headerRow; i < vals.length; i++) {
       const row = vals[i] || [];
       const veh = txt(c(row, 'vehicle'));
+
+      // NEW: skip cancelled challans (plant / vehicle / type says CANCEL)
+      if (/CANCEL/i.test(`${txt(c(row, 'plant'))} ${veh} ${txt(c(row, 'rowType'))}`)) { st.emptySkipped++; continue; }
+
       const amount = byWt ? round(g(row, 'wt') * g(row, 'rate')) : (g(row, 'amount') || g(row, 'rate'));
       let tds: number;
       if (byWt) tds = round(amount * TDS_RATE);
@@ -157,7 +164,11 @@ export async function syncFromSheet() {
       else tds = g(row, 'tds');
       const qty = g(row, 'dieselQty'), dAmt = g(row, 'dieselAmt');
       const net = byWt ? round(amount - tds - g(row, 'deduction') - dAmt) : (L.net ? g(row, 'net') : amount - tds - dAmt);
-      if (!veh && !(amount || dAmt || net)) { st.emptySkipped++; continue; }
+
+      // CHANGED: a row is a real trip/record only if it has a vehicle, a challan number,
+      // a record type (payment rows etc.) or a paid amount. Rows that only have the
+      // pre-filled rate/amount (e.g. 1000 filled down) are skipped.
+      if (!veh && !txt(c(row, 'challan')) && !txt(c(row, 'rowType')) && !g(row, 'paidAmt')) { st.emptySkipped++; continue; }
 
       const rawDue = c(row, 'dueAmt');
       const hasDue = !!L.dueAmt && txt(rawDue) !== '';
