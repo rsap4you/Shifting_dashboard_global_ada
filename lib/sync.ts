@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import { getDb, Trip } from './db';
+   
+const TAB_KEYWORDS = ['SHILA', 'PUNDRI', 'BAGODAR', 'TRIVENI', 'ARAJU'];          
 
-const TAB_KEYWORDS = ['SHILA', 'PUNDRI', 'BAGODAR', 'TRIVENI', 'ARAJU'];
 const WEIGHT_RATE_KEYWORDS = ['BAGODAR'];
 const TDS_RATE = 0.02, HEADER_SCAN_ROWS = 15;
 const HEADERS: Record<string, string[]> = {
