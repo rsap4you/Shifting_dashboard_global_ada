@@ -11,6 +11,8 @@
     --brand:#0d9488; --navy:#0f2942; --neg:#dc2626; --pos:#0d9488; --warn:#d97706;
     --shadow:0 1px 3px rgba(15,41,66,.08),0 4px 14px rgba(15,41,66,.05);
   }
+
+  header .logo { height:44px; width:auto; border-radius:8px; background:#fff; padding:3px; }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#0b1520; --card:#122130; --text:#e6edf5; --muted:#8fa3b8; --line:#223448; --zebra:#162738;
             --brand:#2dd4bf; --navy:#0a1a2a; --neg:#f87171; --pos:#2dd4bf; --warn:#fbbf24; --shadow:0 1px 3px rgba(0,0,0,.5); }
@@ -102,7 +104,7 @@
 </div>
 
 <header>
-  <span class="dot"></span><h1>Shifting Dashboard</h1>
+  <img src="/logo.jpg" alt="Global ADA Logistics" class="logo"><h1>Shifting Dashboard</h1>
   <span class="sub" id="upd">Loading...</span>
   <button id="ref">Refresh</button>
 </header>
