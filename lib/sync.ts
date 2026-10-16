@@ -1,12 +1,11 @@
 import { google } from 'googleapis';
 import { getDb, Trip } from './db';
-   
-const TAB_KEYWORDS = ['SHILA', 'PUNDRI', 'BAGODAR', 'TRIVENI', 'ARAJU'];          
 
-const WEIGHT_RATE_KEYWORDS = ['BAGODAR'];
-const TDS_RATE = 0.02, HEADER_SCAN_ROWS = 15;
+const TAB_KEYWORDS = ['SHILA', 'PUNDRI', 'TRIVENI', 'ARAJU'];
+
+const HEADER_SCAN_ROWS = 15;
 const HEADERS: Record<string, string[]> = {
-  date: ['LOADINGDATE', 'DATE'], date2: ['UNLOADINGDATE', 'UNLADINGDATE'], wt: ['NETWTMT'], deduction: ['DEDUCTION'],
+  date: ['LOADINGDATE', 'DATE'], date2: ['UNLOADINGDATE', 'UNLADINGDATE'], wt: ['NETWTMT'],
   vehicle: ['VEHICLENO', 'VEHICLENUMBER', 'VEHICLE', 'TRUCKNO', 'TRUCKNUMBER', 'TRUCK', 'VEHNO', 'VEHICALNO', 'VEHICLENO1'],
   rate: ['RATETRIPS', 'TRIPRATE', 'RATETRIP', 'RATEPERTRIP', 'RATE'],
   amount: ['PURCHASEAMOUNT', 'AMOUNT', 'TOTALAMOUNT', 'AMT'], tds: ['TDS2', 'TDS', 'TDS1'],
@@ -15,7 +14,6 @@ const HEADERS: Record<string, string[]> = {
   net: ['NETAMT', 'NETPAYABLE', 'NETAMOUNT', 'NET'], challan: ['CHALLANNO', 'CHALLAN'],
   transporter: ['TRANSPORTERNAME', 'TRANSPORTER'], plant: ['PLANTNAME', 'PLANT'], pump: ['PUMPNAME'],
   time: ['UNLOADINGTIME', 'UNLADINGTIME'], rowType: ['TYPE'],
-  // CHANGED: more header names accepted for paid / due columns
   paidAmt: ['PAIDAMT', 'PAIDAMOUNT', 'PAID', 'PAYMENT', 'PAYMENTAMT', 'ADVANCE'],
   dueAmt: ['DUEAMT', 'DUEAMOUNT', 'DUE', 'BALANCE', 'BALANCEAMT'],
 };
@@ -117,6 +115,7 @@ export type TabStat = {
   map: Record<string, number>;
   dateKinds: Record<string, number>; // serial / dmy / mdy / ambiguous / iso / name / none
   dateSamples: string[];             // examples of mdy + ambiguous dates and how they were read
+  netMismatch: string[];             // rows where the sheet's Net Payable differs from Amount - TDS - Diesel
 };
 
 export async function syncFromSheet() {
@@ -140,14 +139,13 @@ export async function syncFromSheet() {
     const vals = (res.data.values || []) as Cell[][];
     const L = getLayout(vals);
     if (!L) { skipped.push(tab); continue; }
-    const byWt = WEIGHT_RATE_KEYWORDS.some(k => tab.toUpperCase().includes(k)) && !!L.wt && !!L.rate;
     const c = (row: Cell[], k: string) => (L[k] ? row[L[k] - 1] : undefined);
     const g = (row: Cell[], k: string) => num(c(row, k));
 
     const st: TabStat = {
       tab, sheetRows: Math.max(0, vals.length - L.headerRow), kept: 0, emptySkipped: 0, noDate: 0, amountZero: 0,
       headerRow: L.headerRow, map: Object.fromEntries(Object.entries(L).filter(([k]) => k !== 'headerRow')) as Record<string, number>,
-      dateKinds: {}, dateSamples: [],
+      dateKinds: {}, dateSamples: [], netMismatch: [],
     };
     let ref = 0; // last reliable date seen in this tab
 
@@ -155,21 +153,30 @@ export async function syncFromSheet() {
       const row = vals[i] || [];
       const veh = txt(c(row, 'vehicle'));
 
-      // NEW: skip cancelled challans (plant / vehicle / type says CANCEL)
+      // skip cancelled challans (plant / vehicle / type says CANCEL)
       if (/CANCEL/i.test(`${txt(c(row, 'plant'))} ${veh} ${txt(c(row, 'rowType'))}`)) { st.emptySkipped++; continue; }
 
-      const amount = byWt ? round(g(row, 'wt') * g(row, 'rate')) : (g(row, 'amount') || g(row, 'rate'));
+      const amount = g(row, 'amount') || g(row, 'rate');
       let tds: number;
-      if (byWt) tds = round(amount * TDS_RATE);
-      else if (L.tds && /%/.test(txt(c(row, 'tds')))) { const p = g(row, 'tds'); tds = round(amount * (p > 1 ? p / 100 : p)); }
+      if (L.tds && /%/.test(txt(c(row, 'tds')))) { const p = g(row, 'tds'); tds = round(amount * (p > 1 ? p / 100 : p)); }
       else tds = g(row, 'tds');
       const qty = g(row, 'dieselQty'), dAmt = g(row, 'dieselAmt');
-      const net = byWt ? round(amount - tds - g(row, 'deduction') - dAmt) : (L.net ? g(row, 'net') : amount - tds - dAmt);
 
-      // CHANGED: a row is a real trip/record only if it has a vehicle, a challan number,
+      // Net is ALWAYS calculated here: Amount - TDS - Diesel.
+      // The sheet's Net Payable column is NOT used, so "Other Deductions" can never be a hidden leftover.
+      const net = round(amount - tds - dAmt);
+
+      // A row is a real trip/record only if it has a vehicle, a challan number,
       // a record type (payment rows etc.) or a paid amount. Rows that only have the
       // pre-filled rate/amount (e.g. 1000 filled down) are skipped.
       if (!veh && !txt(c(row, 'challan')) && !txt(c(row, 'rowType')) && !g(row, 'paidAmt')) { st.emptySkipped++; continue; }
+
+      // Report rows where the sheet's own Net Payable disagrees with the formula
+      if (L.net) {
+        const sheetNet = g(row, 'net'), diff = round(net - sheetNet);
+        if (Math.abs(diff) > 0.01 && st.netMismatch.length < 50)
+          st.netMismatch.push(`row ${i + 1}: veh ${veh}, amt ${amount}, tds ${tds}, diesel ${dAmt}, sheet net ${sheetNet}, calc net ${net}, diff ${diff}`);
+      }
 
       const rawDue = c(row, 'dueAmt');
       const hasDue = !!L.dueAmt && txt(rawDue) !== '';
@@ -190,7 +197,7 @@ export async function syncFromSheet() {
       trips.push({
         tab, date, dateTs, challan: txt(c(row, 'challan')), vehicle: veh || '(NO VEHICLE)',
         wt: g(row, 'wt'), transporter: txt(c(row, 'transporter')), plant: txt(c(row, 'plant')).toUpperCase() || '(BLANK)',
-        amount, tds, qty, dAmt, net, oth: round(amount - tds - dAmt - net), paidAmt, dueAmt,
+        amount, tds, qty, dAmt, net, oth: 0, paidAmt, dueAmt,
         pump: txt(c(row, 'pump')), time: timeStr(c(row, 'time')), rtype: txt(c(row, 'rowType')),
       });
     }
