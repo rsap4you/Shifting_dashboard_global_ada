@@ -3,7 +3,7 @@ import { getDb, Trip } from './db';
 
 const TAB_KEYWORDS = ['SHILA', 'PUNDRI', 'TRIVENI', 'ARAJU'];
 
-const HEADER_SCAN_ROWS = 15;
+const HEADER_SCAN_ROWS = 30;
 const HEADERS: Record<string, string[]> = {
   date: ['LOADINGDATE', 'DATE'], date2: ['UNLOADINGDATE', 'UNLADINGDATE'], wt: ['NETWTMT'],
   vehicle: ['VEHICLENO', 'VEHICLENUMBER', 'VEHICLE', 'TRUCKNO', 'TRUCKNUMBER', 'TRUCK', 'VEHNO', 'VEHICALNO', 'VEHICLENO1'],
